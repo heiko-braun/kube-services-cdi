@@ -1,104 +1,73 @@
 package org.wildfly.swarm.openshift.inject;
 
-import javax.enterprise.context.spi.CreationalContext;
 import javax.enterprise.event.Observes;
-import javax.enterprise.inject.InjectionException;
-import javax.enterprise.inject.spi.AnnotatedType;
+import javax.enterprise.inject.Vetoed;
+import javax.enterprise.inject.spi.BeanManager;
+import javax.enterprise.inject.spi.BeforeBeanDiscovery;
 import javax.enterprise.inject.spi.Extension;
-import javax.enterprise.inject.spi.InjectionTarget;
-import javax.enterprise.inject.spi.ProcessInjectionTarget;
-import javax.enterprise.inject.spi.AnnotatedField;
-import javax.enterprise.inject.spi.InjectionPoint;
-import java.util.Optional;
-import java.util.Set;
 
+@Vetoed
 public class ServiceExtension implements Extension {
 
-    public <T> void processInjectionTarget(final @Observes ProcessInjectionTarget<T> pit) {
+  public ServiceExtension() {
+    System.out.println("ServiceExtension");
+  }
 
-        final InjectionTarget<T> it = pit.getInjectionTarget();
-        InjectionTarget<T> wrapped = new InjectionTarget<T>() {
-            @Override
-            public void inject(T instance, CreationalContext<T> ctx) {
+ /* <X> void processInjectionTarget(@Observes ProcessInjectionTarget<X> pit) {
 
-                it.inject(instance, ctx);
+    final InjectionTarget<X> it = pit.getInjectionTarget();
+    final AnnotatedType<X> at = pit.getAnnotatedType();
 
-                AnnotatedType<T> at = pit.getAnnotatedType();
-                for (AnnotatedField field : at.getFields()) {
-                    try {
+    InjectionTarget<X> wrapper = new InjectionTarget<X>() {
 
-                        if (field.isAnnotationPresent(Service.class)) {
+      @Override
+      public X produce(CreationalContext<X> ctx) {
+        return it.produce(ctx);
+      }
 
-                            Service svc = at.getAnnotation(Service.class);
-                            Optional<String> serviceTarget = getServiceTarget(svc.value());
+      @Override
+      public void dispose(X instance) {
+        it.dispose(instance);
+      }
 
-                            Class<?> baseType = field.getJavaMember().getType();
+      @Override
+      public Set<InjectionPoint> getInjectionPoints() {
+        return it.getInjectionPoints();
+      }
 
-                            if (baseType == Optional.class) {
-                                field.getJavaMember().set(instance, serviceTarget);
-                            }  else {
-                                pit.addDefinitionError(
-                                        new InjectionException("Type " + baseType + " of Field " + field.getJavaMember().getName() + " not recognized yet!")
-                                );
-                            }
-
-                        }
-
-                    } catch (Exception e) {
-                        pit.addDefinitionError(new InjectionException(e));
-                    }
-                }
+      @Override
+      public void inject(X instance, CreationalContext<X> ctx) {
+        it.inject(instance, ctx);
+        for (Field field : at.getJavaClass().getDeclaredFields()) {
+          Service annotation = field.getAnnotation(Service.class);
+          if (annotation != null) {
+            String key = annotation.value();
+            field.setAccessible(true);
+            try {
+              field.set(instance, getServiceTarget(annotation.value()));
+            } catch (IllegalArgumentException | IllegalAccessException e) {
+              throw new RuntimeException("Could not resolve service  reference", e);
             }
-
-            @Override
-            public void postConstruct(T instance) {
-                it.postConstruct(instance);
-            }
-
-            @Override
-            public void preDestroy(T instance) {
-                it.dispose(instance);
-            }
-
-            @Override
-            public void dispose(T instance) {
-                it.dispose(instance);
-            }
-
-            @Override
-            public Set<InjectionPoint> getInjectionPoints() {
-                return it.getInjectionPoints();
-            }
-
-            @Override
-            public T produce(CreationalContext<T> ctx) {
-                return it.produce(ctx);
-            }
-        };
-        pit.setInjectionTarget(wrapped);
-    }
-
-    private static int servicePort(String serviceName) {
-        String envName = serviceName.replace("-", "_").toUpperCase() + "_SERVICE_PORT";
-        String envPort = System.getenv(envName);
-        if (envPort == null) {
-            return -1;
+          }
         }
+      }
 
-        return Integer.parseInt(envPort);
-    }
+      @Override
+      public void postConstruct(X instance) {
+        it.postConstruct(instance);
+      }
 
-    private String serviceHost(String serviceName) {
-        String envName = serviceName.replace("-", "_").toUpperCase() + "_SERVICE_HOST";
-        return System.getenv(envName);
-    }
+      @Override
+      public void preDestroy(X instance) {
+        it.preDestroy(instance);
+      }
 
-    private Optional<String> getServiceTarget(String serviceName) {
+    };
 
-        if (serviceHost(serviceName) != null) {
-            return Optional.of("http://" + serviceHost(serviceName) + ":" + servicePort(serviceName));
-        }
+    pit.setInjectionTarget(wrapper);
+  }*/
 
-        return Optional.empty();
-    }
+  public void addConfigView(@Observes BeforeBeanDiscovery bbd, BeanManager beanManager) {
+    bbd.addAnnotatedType(beanManager.createAnnotatedType(ServiceValueProducer.class));
+  }
 }
